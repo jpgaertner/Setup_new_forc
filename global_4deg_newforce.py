@@ -158,7 +158,6 @@ class GlobalFourDegreeSetup(VerosSetup):
             thbot = Variable("thbot", forc_dim, "", "", time_dependent=False),
             swr_net = Variable("swr_net", forc_dim, "", "", time_dependent=False),
             lwr_dw = Variable("lwr_dw", forc_dim, "", "", time_dependent=False),
-            siconc = Variable("siconc", forc_dim, "", "", time_dependent=False), # remove/replace with prognostic sea-ice
             maskI = Variable("maskI", forc_dim, "", "", time_dependent=False),
             # versis
             uWind_f = Variable("Zonal wind velocity", forc_dim, "m/s"),
@@ -316,8 +315,6 @@ class GlobalFourDegreeSetup(VerosSetup):
             "thbot",
             "swr_net",
             "lwr_dw",
-            "siconc",
-            "maskI",
             # versis forcing
             "uWind_f","vWind_f",
             "SWDown_f","LWDown_f",
@@ -375,12 +372,7 @@ class GlobalFourDegreeSetup(VerosSetup):
         hybi = self._read_forcing_legacy('hybi', "era5_ml")[-3:]
         hyam = self._read_forcing_legacy('hyam', "era5_ml")[-2:]   # L136-L137
         hybm = self._read_forcing_legacy('hybm', "era5_ml")[-2:]   # L136-L137
-        # Replace with prognostic sea-ice from Veros
-        vs.siconc = update(vs.siconc, at[2:-2, 2:-2, :],
-                           veros.tools.interpolate(forc_time_xygrid,
-                           self._read_forcing_legacy('siconc', "era5_sfc", flip_y=True),
-                           time_xygrid)
-        )
+
         #-------------------
         lnsp = veros.tools.interpolate(forc_time_xygrid,
                                        self._read_forcing_legacy('lnsp', "era5_ml", flip_y=True)[..., 0, :],   # L136
@@ -421,8 +413,6 @@ class GlobalFourDegreeSetup(VerosSetup):
         vs.qbot = update(vs.qbot, at[2:-2, 2:-2, :], q[..., 0, :])   # L136
         vs.tbot = update(vs.tbot, at[2:-2, 2:-2, :], t[..., 0, :])   # L136
         vs.spres = update(vs.spres, at[2:-2, 2:-2, :], npx.exp(lnsp))
-
-        vs.maskI = npx.where(vs.siconc > 0, 1, npx.zeros(vs.siconc.shape))
 
         for m in range(12):
             ph = self._get_press_levs(vs.spres[..., m], hyai, hybi)
@@ -545,7 +535,7 @@ class GlobalFourDegreeSetup(VerosSetup):
         state.diagnostics["snapshot"].output_frequency = 86400.0
         state.diagnostics["snapshot"].output_variables += ["zbot", "spres",
             "ubot", "vbot", "tcc", "qbot", "rbot", "tbot", "thbot",
-            "swr_net", "lwr_dw", "siconc", "maskI", "qnet_forc", "qnec_forc",
+            "swr_net", "lwr_dw", "maskI", "qnet_forc", "qnec_forc",
             "ocn_lwnet", "ice_lwdw", "ice_lwup", "ocn_sen",
             "ocn_lat", "ice_sen", "ice_lat", "ocn_taux",
             "ocn_tauy", "ice_taux", "ice_tauy", "maskT_noI",
@@ -592,7 +582,8 @@ def set_forcing_kernel(state):
     thbot   = current_value(vs.thbot)
     swr_net = current_value(vs.swr_net)
     lwr_dw  = current_value(vs.lwr_dw)
-    maskI   = current_value(vs.maskI)
+
+    maskI = npx.where(vs.Area > 0.5, 1, 0)
 
     maskT_noI = npx.where(maskI == 1, 0, vs.maskT[:, :, -1])
     temp = vs.temp[:, :, -1, vs.tau] + 273.12
