@@ -676,33 +676,23 @@ def set_forcing_kernel(state):
         (qnet + qnec * (sst - vs.temp[:, :, -1, vs.tau])) * vs.maskT[:, :, -1] / cp_0 / settings.rho_0
     )
 
-
-    # TODO: remove what is not needed in the upper part of the setup
-    # # salinity restoring
-    # t_rest = 30 * 86400.0
-    # sss = f1 * vs.sss_clim[:, :, n1] + f2 * vs.sss_clim[:, :, n2]
-    # vs.forc_salt_surface = 1.0 / t_rest * (sss - vs.salt[:, :, -1, vs.tau]) * vs.maskT[:, :, -1] * vs.dzt[-1]
+    # the salt flux is calculated in the growth routine of versis
 
 
     ##### versis #####
 
-    vs.uWind = current_value(vs.uWind_f)
-    vs.vWind = current_value(vs.vWind_f)
-    vs.wSpeed = npx.sqrt(vs.uWind**2 + vs.vWind**2)
-    vs.SWDown = current_value(vs.SWDown_f)
-    vs.LWDown = current_value(vs.LWDown_f)
-    vs.ATemp = current_value(vs.ATemp_f)
-    vs.aqh = current_value(vs.aqh_f)
-    vs.precip = current_value(vs.precip_f)
-    vs.snowfall = current_value(vs.snowfall_f)
-    vs.evap = current_value(vs.evap_f)
+    vs.uWind     = current_value(vs.uWind_f)
+    vs.vWind     = current_value(vs.vWind_f)
+    vs.wSpeed    = npx.sqrt(vs.uWind**2 + vs.vWind**2)
+    vs.SWDown    = current_value(vs.SWDown_f)
+    vs.LWDown    = current_value(vs.LWDown_f)
+    vs.ATemp     = current_value(vs.ATemp_f)
+    vs.aqh       = current_value(vs.aqh_f)
+    vs.precip    = current_value(vs.precip_f)
+    vs.snowfall  = current_value(vs.snowfall_f)
+    vs.evap      = current_value(vs.evap_f)
     vs.surfPress = current_value(vs.surfPress_f)
 
-
-    # # apply simple ice mask
-    # mask = npx.logical_and(vs.temp[:, :, -1, vs.tau] * vs.maskT[:, :, -1] < -1.8, vs.forc_temp_surface < 0.0)
-    # vs.forc_temp_surface = npx.where(mask, 0.0, vs.forc_temp_surface)
-    # vs.forc_salt_surface = npx.where(mask, 0.0, vs.forc_salt_surface)
 
     return KernelOutput(
         qnet_forc=qnet,
@@ -723,7 +713,6 @@ def set_forcing_kernel(state):
         surface_tauy=vs.surface_tauy,
         forc_tke_surface=vs.forc_tke_surface,
         forc_temp_surface=vs.forc_temp_surface,
-        forc_salt_surface=vs.forc_salt_surface,
         uWind = vs.uWind,
         vWind = vs.vWind,
         wSpeed = vs.wSpeed,
