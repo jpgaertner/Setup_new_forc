@@ -573,23 +573,27 @@ def set_forcing_kernel(state):
     year_in_seconds = 360 * 86400.0
     (n1, f1), (n2, f2) = veros.tools.get_periodic_interval(vs.time, year_in_seconds, year_in_seconds / 12.0, 12)
 
+    # interpolate the monthly mean data to the value at the current time step
+    def current_value(field):
+        return f1 * field[:, :, n1] + f2 * field[:, :, n2]
+
+
     # --------------------------------------------------------
     use_new_forcing = True #!!!!!
 
-    spres = f1 * vs.spres[:, :, n1] + f2 * vs.spres[:, :, n2]
-    zbot = f1 * vs.zbot[:, :, n1] + f2 * vs.zbot[:, :, n2]
-    ubot = f1 * vs.ubot[:, :, n1] + f2 * vs.ubot[:, :, n2]
-    vbot = f1 * vs.vbot[:, :, n1] + f2 * vs.vbot[:, :, n2]
-    tcc = f1 * vs.tcc[:, :, n1] + f2 * vs.tcc[:, :, n2]
-    qbot = f1 * vs.qbot[:, :, n1] + f2 * vs.qbot[:, :, n2]
-    rbot = f1 * vs.rbot[:, :, n1] + f2 * vs.rbot[:, :, n2]
-    tbot = f1 * vs.tbot[:, :, n1] + f2 * vs.tbot[:, :, n2]
-    thbot = f1 * vs.thbot[:, :, n1] + f2 * vs.thbot[:, :, n2]
-    swr_net = f1 * vs.swr_net[:, :, n1] + f2 * vs.swr_net[:, :, n2]
-    lwr_dw = f1 * vs.lwr_dw[:, :, n1] + f2 * vs.lwr_dw[:, :, n2]
-    maskI = f1 * vs.maskI[:, :, n1] + f2 * vs.maskI[:, :, n2]
+    spres   = current_value(vs.spres)
+    zbot    = current_value(vs.zbot)
+    ubot    = current_value(vs.ubot)
+    vbot    = current_value(vs.vbot)
+    tcc     = current_value(vs.tcc)
+    qbot    = current_value(vs.qbot)
+    rbot    = current_value(vs.rbot)
+    tbot    = current_value(vs.tbot)
+    thbot   = current_value(vs.thbot)
+    swr_net = current_value(vs.swr_net)
+    lwr_dw  = current_value(vs.lwr_dw)
+    maskI   = current_value(vs.maskI)
 
-    # maskT_noI = vs.maskT[:, :, -1].copy() #TODO not needed, right?
     maskT_noI = npx.where(maskI == 1, 0, vs.maskT[:, :, -1])
     temp = vs.temp[:, :, -1, vs.tau] + 273.12
 
@@ -681,10 +685,6 @@ def set_forcing_kernel(state):
 
 
     ##### versis #####
-
-    # interpolate the monthly mean data to the value at the current time step
-    def current_value(field):
-        return f1 * field[:, :, n1] + f2 * field[:, :, n2]
 
     vs.uWind = current_value(vs.uWind_f)
     vs.vWind = current_value(vs.vWind_f)
