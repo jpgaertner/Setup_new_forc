@@ -71,7 +71,7 @@ class GlobalFourDegreeSetup(VerosSetup):
 
         settings.dt_mom = 1800.0
         settings.dt_tracer = 86400.0
-        settings.runlen = settings.dt_tracer * 360 * 5# * 360 * 10
+        settings.runlen = settings.dt_tracer * 180 # * 360 * 10
 
         settings.x_origin = 4.0
         settings.y_origin = -76.0
@@ -98,7 +98,7 @@ class GlobalFourDegreeSetup(VerosSetup):
         settings.alpha_tke = 30.0
         settings.mxl_min = 1e-8
         settings.tke_mxl_choice = 2
-        settings.kappaM_min = 2e-4
+        settings.kappaM_min = 2e-4 # double these two values and see ehat happens
         settings.kappaH_min = 2e-5
         settings.enable_kappaH_profile = True
         settings.enable_tke_superbee_advection = True
@@ -157,19 +157,23 @@ class GlobalFourDegreeSetup(VerosSetup):
             tbot = Variable("tbot", forc_dim, "", "", time_dependent=False),
             thbot = Variable("thbot", forc_dim, "", "", time_dependent=False),
             swr_net = Variable("swr_net", forc_dim, "", "", time_dependent=False),
+            swr_eff = Variable("swr_eff", hor_dim, " "),
             lwr_dw = Variable("lwr_dw", forc_dim, "", "", time_dependent=False),
             maskI = Variable("maskI", forc_dim, "", "", time_dependent=False),
             # versis
             uWind_f = Variable("Zonal wind velocity", forc_dim, "m/s"),
             vWind_f = Variable("Meridional wind velocity", forc_dim, "m/s"),
-            SWDown_f = Variable("Downward shortwave radiation", forc_dim, "W/m2"),
-            LWDown_f = Variable("Downward longwave radiation", forc_dim, "W/m2"),
+            SWdown_f = Variable("Downward shortwave radiation", forc_dim, "W/m2"),
+            LWdown_f = Variable("Downward longwave radiation", forc_dim, "W/m2"),
             ATemp_f = Variable("Atmospheric temperature", forc_dim, "K"),
             aqh_f = Variable("Atmospheric specific humidity", forc_dim, "g/kg"),
             precip_f = Variable("Precipitation rate", forc_dim, "m/s"),
             snowfall_f = Variable("Snowfall rate", forc_dim, "m/s"),
             evap_f = Variable("Evaporation", forc_dim, "m"),
             surfPress_f = Variable("Surface pressure", forc_dim, "P"),
+            #
+            qnet_out = Variable(" ", hor_dim, " "),
+            SWnet = Variable(" ", hor_dim, " ")
         )
 
     def _read_forcing(self, var):
@@ -177,6 +181,10 @@ class GlobalFourDegreeSetup(VerosSetup):
             var_obj = infile.variables[var]
             return npx.array(var_obj).T
 
+    # the imported array gets transposed so that the first/ x- coordinate of the array is the longitude
+    # (see hor_dim = ("xt", "yt"))
+    # the latitudional orientation needs to be flipped for horizontal fields as north and south are switched
+    # (in pythonic displaying of arrays, ie matrices start at the top (not bottom) left corner)
     def _read_forcing_legacy(self, var, type="forcing", flip_y=False):
         with netCDF4.Dataset(DATA_FILES[type], "r") as infile:
             var_obj = npx.array(infile.variables[var][...]).T
@@ -317,7 +325,7 @@ class GlobalFourDegreeSetup(VerosSetup):
             "lwr_dw",
             # versis forcing
             "uWind_f","vWind_f",
-            "SWDown_f","LWDown_f",
+            "SWdown_f","LWdown_f",
             "ATemp_f","aqh_f",
             "precip_f","snowfall_f","evap_f",
             "surfPress_f",
@@ -474,8 +482,8 @@ class GlobalFourDegreeSetup(VerosSetup):
         # forcing fields
         vs.uWind_f = read_int_update(vs.uWind_f, 'u', 'ml') # [m/s]
         vs.vWind_f = read_int_update(vs.vWind_f, 'v', 'ml') # [m/s]
-        vs.SWDown_f = read_int_update(vs.SWDown_f, 'msdwswrf', 'sfc') # [W/m2]
-        vs.LWDown_f = read_int_update(vs.LWDown_f, 'msdwlwrf', 'sfc') # [W/m2]
+        vs.SWdown_f = read_int_update(vs.SWdown_f, 'msdwswrf', 'sfc') # [W/m2]
+        vs.LWdown_f = read_int_update(vs.LWdown_f, 'msdwlwrf', 'sfc') # [W/m2]
         vs.ATemp_f = read_int_update(vs.ATemp_f, 't', 'ml') # [K]
         vs.aqh_f = read_int_update(vs.aqh_f, 'q', 'ml') # [kg/kg]
         rhoWater = 1000
@@ -500,7 +508,8 @@ class GlobalFourDegreeSetup(VerosSetup):
         vs.dxU = ones2d * vs.dxu[:,npx.newaxis]
         vs.dyU = ones2d * vs.dyu
 
-        # these are not specified in veros #TODO calculate them by averaging?
+        # these are not specified in veros
+        # TODO calculating them is only needed if the grid cells are not uniformly sized
         vs.dxG = ones2d * vs.dxU
         vs.dyG = ones2d * vs.dyU
         vs.dxV = ones2d * vs.dxU
@@ -518,7 +527,7 @@ class GlobalFourDegreeSetup(VerosSetup):
         vs.rA = vs.area_t
         vs.rAu = vs.area_u
         vs.rAv = vs.area_v
-        vs.rAz = vs.rA #TODO calculate this by averaging; not specified in veros 
+        vs.rAz = vs.rA # TODO see vs.dxG etc.
         vs.recip_rA = 1 / vs.rA
         vs.recip_rAu = 1 / vs.rAu
         vs.recip_rAv = 1 / vs.rAv
@@ -539,13 +548,15 @@ class GlobalFourDegreeSetup(VerosSetup):
             "ocn_lwnet", "ice_lwdw", "ice_lwup", "ocn_sen",
             "ocn_lat", "ice_sen", "ice_lat", "ocn_taux",
             "ocn_tauy", "ice_taux", "ice_tauy", "maskT_noI",
-            "uWind","vWind","precip","hIceMean","hSnowMean","Area","uIce","vIce","ssh_an"]
+            "uWind","vWind","precip","ATemp","SWdown","SWnet",
+            "hIceMean","hSnowMean","Area","uIce","vIce","ssh_an",
+            "swr_eff","qnet_out"]
         state.diagnostics["overturning"].output_frequency = 360 * 86400.0
         state.diagnostics["overturning"].sampling_frequency = settings.dt_tracer
         state.diagnostics["energy"].output_frequency = 360 * 86400.0
         state.diagnostics["energy"].sampling_frequency = 86400
         average_vars = ["temp", "salt", "u", "v", "w", "surface_taux", "surface_tauy", "psi", "kbot",
-                        "qnet_forc", "qnec_forc"]
+                        "qnet_forc", "qnec_forc","ocn_lat","ocn_sen","ocn_lwnet"]
         state.diagnostics["averages"].output_variables = average_vars
         state.diagnostics["averages"].output_frequency = 30 * 86400.0
         state.diagnostics["averages"].sampling_frequency = 86400
@@ -640,26 +651,32 @@ def set_forcing_kernel(state):
         )
     #
 
-    qnet = npx.zeros_like(vs.forc_temp_surface)
-    qnec = npx.zeros_like(vs.forc_temp_surface)
+    # reduce the shortwave flux at the ocean surface by what is reflected due to albedo on open water
+    # and reflected and absorbed by sea ice
+    swr_eff = vs.IcePenetSW * maskI + swr_net * maskT_noI * (1 - 0.1)
+    # swr_eff = swr_net
 
     # heat flux : W/m^2 K kg/J m^3/kg = K m/s
     cp_0 = 3991.86795711963
     sst = f1 * vs.sst_clim[:, :, n1] + f2 * vs.sst_clim[:, :, n2]
     if use_new_forcing:
         qnec_ = - (dqir_dt + dqh_dt + dqe_dt)
-        qnet_ = swr_net + ocn_lwnet\
-             + ice_lwdw + ice_lwup\
-             + ocn_sen + ocn_lat\
-             + ice_sen + ice_lat
-        mean_flux = (
-            npx.sum(qnet_[2:-2, 2:-2] * vs.area_t[2:-2, 2:-2]) / npx.sum(vs.area_t[2:-2, 2:-2])
-        )
-        qnet_ = (qnet_ - mean_flux) * vs.maskT[:, :, -1]
+        qnet_ =  swr_eff \
+                + ocn_lwnet \
+                + ice_lwdw + ice_lwup \
+                + ocn_sen + ocn_lat \
+                + ice_sen + ice_lat
+        # mean_flux = (
+        #     npx.sum(qnet_[2:-2, 2:-2] * vs.area_t[2:-2, 2:-2]) / npx.sum(vs.area_t[2:-2, 2:-2])
+        # )
+        # qnet_ = (qnet_ - mean_flux) * vs.maskT[:, :, -1]
     else:
         qnec_ = f1 * vs.qnec[:, :, n1] + f2 * vs.qnec[:, :, n2]
         qnet_ = f1 * vs.qnet[:, :, n1] + f2 * vs.qnet[:, :, n2]
 
+    # this is crucial, versis diverges without qnet & qnec being zero at the boundaries
+    qnet = npx.zeros_like(vs.forc_temp_surface)
+    qnec = npx.zeros_like(vs.forc_temp_surface)
     qnet = update(qnet, at[2:-2,2:-2], qnet_[2:-2,2:-2])
     qnec = update(qnec, at[2:-2,2:-2], qnec_[2:-2,2:-2])
 
@@ -675,8 +692,8 @@ def set_forcing_kernel(state):
     vs.uWind     = current_value(vs.uWind_f)
     vs.vWind     = current_value(vs.vWind_f)
     vs.wSpeed    = npx.sqrt(vs.uWind**2 + vs.vWind**2)
-    vs.SWDown    = current_value(vs.SWDown_f)
-    vs.LWDown    = current_value(vs.LWDown_f)
+    vs.SWdown    = current_value(vs.SWdown_f)
+    vs.LWdown    = current_value(vs.LWdown_f)
     vs.ATemp     = current_value(vs.ATemp_f)
     vs.aqh       = current_value(vs.aqh_f)
     vs.precip    = current_value(vs.precip_f)
@@ -684,8 +701,9 @@ def set_forcing_kernel(state):
     vs.evap      = current_value(vs.evap_f)
     vs.surfPress = current_value(vs.surfPress_f)
 
-
     return KernelOutput(
+        qnet_out =qnet,
+        SWnet = swr_net,
         qnet_forc=qnet,
         qnec_forc=qnec,
         ocn_lwnet=ocn_lwnet,
@@ -704,11 +722,12 @@ def set_forcing_kernel(state):
         surface_tauy=vs.surface_tauy,
         forc_tke_surface=vs.forc_tke_surface,
         forc_temp_surface=vs.forc_temp_surface,
+        swr_eff = swr_eff,
         uWind = vs.uWind,
         vWind = vs.vWind,
         wSpeed = vs.wSpeed,
-        SWDown = vs.SWDown,
-        LWDown = vs.LWDown,
+        SWdown = vs.SWdown,
+        LWdown = vs.LWdown,
         ATemp = vs.ATemp,
         aqh = vs.aqh,
         precip = vs.precip,
